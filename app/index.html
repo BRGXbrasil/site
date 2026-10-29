@@ -162,7 +162,6 @@ label{display:block;margin:0 0 6px;color:var(--muted);font-size:.8rem}
 .feedback{padding:13px;border-radius:12px;font-size:.9rem;line-height:1.5}
 .feedback.ok{background:rgba(74,107,79,.08);color:var(--good);border:0.5px solid rgba(74,107,79,.2)}
 .feedback.no{background:rgba(178,59,46,.07);color:var(--danger);border:0.5px solid rgba(178,59,46,.18)}
-.recordgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.recordcard{padding:18px;border:0.5px solid var(--line);border-radius:16px;background:rgba(255,255,255,.66)}.recordcard h3{margin:8px 0 5px;font-size:1rem}.recordcard p{margin:0;color:var(--muted);font-size:.84rem;line-height:1.45}.recordcard .btnrow{margin-top:13px}.recordmeta{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;color:var(--muted);font-size:.78rem}.toast{position:fixed;right:18px;bottom:84px;z-index:80;padding:13px 16px;border-radius:12px;background:var(--ink);color:#fff;box-shadow:var(--shadow);font-size:.86rem;opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease}.toast.show{opacity:1;transform:translateY(0)}
 .searchbox input{padding:15px 16px;border-radius:14px;font-size:1rem}
 .hits{display:grid;gap:10px;margin-top:12px}
 .popcard{padding:14px;border-radius:14px;background:rgba(255,255,255,.72);border:0.5px solid var(--line);}
@@ -983,38 +982,7 @@ function load(){
   };
 }
 let DB=load();
-// Migração compatível: versões antigas não tinham anotações de atendimento.
-if(!Array.isArray(DB.anotacoes)) DB.anotacoes=[];
 function save(){localStorage.setItem(KEY,JSON.stringify(DB))}
-function showToast(message){
-  const old=document.getElementById("toast"); if(old) old.remove();
-  const el=document.createElement("div"); el.id="toast"; el.className="toast"; el.textContent=message;
-  document.body.appendChild(el); requestAnimationFrame(()=>el.classList.add("show"));
-  setTimeout(()=>{el.classList.remove("show");setTimeout(()=>el.remove(),220)},2600);
-}
-function anotacoesRecentes(){return [...DB.anotacoes].sort((a,b)=>b.ts-a.ts)}
-function registroLabel(tipo){return tipo==="ocorrencia"?"Ocorrência":"Demanda não atendida"}
-function registroItem(a){
-  return `<div class="item"><div class="toprow"><h4>${esc(a.cliente||"Sem identificação")}</h4><span class="pill ${a.tipo==="ocorrencia"?"danger":"warn"}">${registroLabel(a.tipo)}</span></div><div class="meta">${esc(a.servico||"Sem serviço informado")} · ${esc(a.quando)}<br>${esc(a.descricao)}${a.responsavel?`<br>Responsável: ${esc(a.responsavel)}`:""}${a.retorno?`<br>Retorno: ${esc(a.retorno)}`:""}</div></div>`;
-}
-function registrarAnotacao(tipo){
-  const ocorrencia=tipo==="ocorrencia";
-  openModal(ocorrencia?"Registrar ocorrência":"Registrar demanda não atendida",ocorrencia?"O registro será salvo no histórico da operação.":"A anotação ficará disponível para acompanhamento e retorno.",`
-    <div class="row"><div><label>Cliente / identificação *</label><input id="aCliente" required placeholder="Nome ou referência"></div><div><label>Serviço relacionado</label><input id="aServico" placeholder="Ex.: coloração, reflexo..."></div></div>
-    <div style="margin-top:10px"><label>${ocorrencia?"O que aconteceu?":"O que a cliente solicitou?"} *</label><textarea id="aDescricao" required placeholder="Descreva com objetividade"></textarea></div>
-    <div class="row" style="margin-top:10px"><div><label>${ocorrencia?"Providência adotada":"Responsável pelo retorno"}</label><input id="aResponsavel" placeholder="Nome ou ação"></div><div><label>Data do retorno</label><input id="aRetorno" type="date"></div></div>
-    <div id="aErro" class="feedback no" style="display:none;margin-top:10px">Preencha o cliente e a descrição antes de salvar.</div>`,()=>{
-      const cliente=document.getElementById("aCliente").value.trim(),servico=document.getElementById("aServico").value.trim(),descricao=document.getElementById("aDescricao").value.trim(),responsavel=document.getElementById("aResponsavel").value.trim(),retorno=document.getElementById("aRetorno").value;
-      if(!cliente||!descricao){document.getElementById("aErro").style.display="block";return}
-      const button=document.getElementById("modalConfirm"); button.disabled=true; button.textContent="Salvando…";
-      DB.anotacoes.push({id:uid(),ts:Date.now(),data:todayISO(),quando:nowBR(),tipo,cliente,servico,descricao,responsavel,retorno,status:"aberta"});
-      DB.anotacoes=DB.anotacoes.slice(-500); save(); closeModal(); subTarefas="anotacoes"; showToast("Registro salvo no histórico"); render();
-    });
-}
-function renderAnotacoes(){
-  const items=anotacoesRecentes();
-  return `<section class="card section"><h2>Histórico de anotações</h2><div class="recordmeta"><span>${items.length} registro(s)</span><span>salvos neste dispositivo</span></div><div class="list" style="margin-top:14px">${items.slice(0,120).map(registroItem).join("")||`<div class="muted">Nenhum registro ainda.</div>`}</div></section>`;
-}
 
 /* reset diário de presença na lista da vez */
 function normalizeVez(){
@@ -1420,17 +1388,7 @@ function renderPainel(){
     </div>
   </section>`;
 
-  const registroCards=`
-    <section class="card section">
-      <h2>Registros de atendimento</h2>
-      <div class="recordgrid">
-        <div class="recordcard"><span class="pill danger">Controle</span><h3>Registro de ocorrência</h3><p>Crie uma anotação quando algo sair do padrão e acompanhe o histórico.</p><div class="btnrow"><button class="btn small" onclick="registrarAnotacao('ocorrencia')">Registrar ocorrência</button></div></div>
-        <div class="recordcard"><span class="pill warn">Acompanhamento</span><h3>Demanda não atendida</h3><p>Registre o pedido pendente, responsável e data de retorno.</p><div class="btnrow"><button class="btn small" onclick="registrarAnotacao('demanda')">Registrar demanda</button></div></div>
-      </div>
-    </section>`;
-
   const sub =
-    subTarefas==="anotacoes" ? renderAnotacoes() :
     subTarefas==="semana" ? `
       <section class="card section">
         <h2>Cronograma da semana</h2>
@@ -1500,10 +1458,9 @@ function renderPainel(){
 
   return `
   ${ring}
-  ${registroCards}
   ${subTarefas==="hoje"?iaConceptCard():""}
   <div class="subtabs">
-    ${[["hoje","Hoje"],["semana","Semana"],["matriz","Matriz de ativações"],["registros","Execuções"],["anotacoes","Anotações"]].map(([id,l])=>
+    ${[["hoje","Hoje"],["semana","Semana"],["matriz","Matriz de ativações"],["registros","Registros"]].map(([id,l])=>
       `<button class="subtab ${subTarefas===id?"on":""}" onclick="subTarefas='${id}';render()">${l}</button>`).join("")}
   </div>
   ${sub}`;
